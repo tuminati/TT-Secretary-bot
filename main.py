@@ -44,5 +44,25 @@ async def stopCalloutBot(ctx):
         await ctx.voice_client.disconnect()
         await ctx.send("👋 Bot disconnected from voice.")
 
+# 🧠 Whisper transcription test command
+@bot.command()
+async def testcallout(ctx):
+    """
+    Transcribes a local audio file (test_callout.wav) using Whisper and sends the text to Discord.
+    """
+    import whisper  # Import the Whisper model
+
+    model = whisper.load_model("base")  # Load the base Whisper model (can use "tiny", "small", etc.)
+    result = model.transcribe("test_callout.wav")  # Transcribe the audio file
+
+    transcription = result["text"]  # Get just the transcribed text portion
+
+    await ctx.send(f"🧠 Transcribed: {transcription}")  # Send result to the Discord text channel
+
+print("Looking for:", os.path.abspath("test_callout.wav"))
+
 # === Run the bot ===
 bot.run(TOKEN)
+
+
+

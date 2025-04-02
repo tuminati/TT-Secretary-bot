@@ -27,23 +27,6 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
  
-# 🧠 Whisper transcription test command
-@bot.command()
-async def testcallout(ctx):
-    """
-    Transcribes a local audio file (test_callout.wav) using Whisper and sends the text to Discord.
-    """
-    import whisper  # Import the Whisper model
-
-    model = whisper.load_model("base")  # Load the base Whisper model (can use "tiny", "small", etc.)
-    result = model.transcribe("test_callout.wav")  # Transcribe the audio file
-
-    transcription = result["text"]  # Get just the transcribed text portion
-
-    await ctx.send(f"🧠 Transcribed: {transcription}")  # Send result to the Discord text channel
-
-print("Looking for:", os.path.abspath("test_callout.wav"))
-
 # --- Track a specific user's VC activity ---
 @bot.event
 async def on_voice_state_update(member, before, after):
@@ -55,7 +38,8 @@ async def on_voice_state_update(member, before, after):
     # User joins a voice channel
     if before.channel is None and after.channel is not None:
         voice_channel = after.channel
-        await voice_channel.connect()
+        voice_client = await voice_channel.connect()  # ✅ store the VoiceClient
+        await asyncio.create_task(record_audio(voice_client))  # ✅ pass the correct object
         print(f"🎯 Target user joined. Bot joined {voice_channel.name}")
 
     # User leaves a voice channel
@@ -64,6 +48,74 @@ async def on_voice_state_update(member, before, after):
         if vc and vc.is_connected():
             await vc.disconnect()
             print("👋 Target user left. Bot disconnected.")
+
+import asyncio
+import tempfile
+import wave
+import pydub
+import whisper
+
+AUDIO_CHUNK_DURATION = 5  # seconds
+TRIGGER_START = "call"
+TRIGGER_END = "end"
+TARGET_USER_ID = 302859384567421319  # Already in your logic
+
+recording = False
+collected_chunks = []
+
+model = whisper.load_model("base")
+
+async def record_audio(vc):
+    global recording, collected_chunks
+    print("🎙️ Bot is now listening for trigger...")
+
+    while vc.is_connected():
+        audio_data = await vc.recv_audio(AUDIO_CHUNK_DURATION)
+
+        # TEMP: Save audio chunk to memory/tempfile
+        temp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        with wave.open(temp.name, "wb") as f:
+            f.setnchannels(1)
+            f.setsampwidth(2)
+            f.setframerate(16000)
+            f.writeframes(audio_data)
+
+        # Transcribe small chunk to check for trigger
+        result = model.transcribe(temp.name)
+        transcript = result["text"].lower().strip()
+
+        print(f"[🟡 Listening] Heard: {transcript}")
+
+        if TRIGGER_START in transcript:
+            print("🟢 Trigger START detected. Begin recording...")
+            recording = True
+            collected_chunks = []
+
+        elif TRIGGER_END in transcript and recording:
+            print("🔴 Trigger END detected. Transcribing full message...")
+            recording = False
+
+            # Merge chunks and transcribe
+            merged = pydub.AudioSegment.empty()
+            for chunk in collected_chunks:
+                merged += pydub.AudioSegment.from_wav(chunk)
+
+            merged_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+            merged.export(merged_file.name, format="wav")
+
+            result = model.transcribe(merged_file.name)
+            final_text = result["text"]
+
+            channel = discord.utils.get(vc.guild.text_channels, id=TEXT_ID)
+            await channel.send(f"📢 Final Callout: {final_text}")
+
+        # If we're inside trigger, collect audio
+        if recording:
+            collected_chunks.append(temp.name)
+
+        await asyncio.sleep(1)
+
+
 
 
 # === Run the bot ===

@@ -1,40 +1,21 @@
-On bot startup:
-    
-Load audio transcription model (e.g., Whisper)
-Define regex patterns or NLP model for parsing option callouts
-Set command(s) to join/leave voice channel
+1. On bot startup:
+    - Do nothing in VC yet (wait passively).
 
-When user sends command "/startCalloutBot":
-    
-Bot joins the voice channel
-Start capturing raw audio from all speakers
-Continuously process audio in chunks (e.g., 5–10 seconds)
+2. When TARGET_USER_ID joins VC:
+    - Bot automatically joins the same VC.
+    - Start quietly listening in background.
 
-Loop:
-    For each audio chunk:
-        
-Transcribe audio to text using Whisper or other STT model
-Check if transcription contains a trigger phrase (e.g., "Hey Callout")
+3. During live voice:
+    - Continuously transcribe short audio chunks (e.g., every 5s).
 
-        If trigger phrase is detected:
-            
-Run parsing logic on the transcription
-Extract:
-Strike price (e.g., "489C" → 489, Call)
-Ticker symbol (e.g., QQQ)
-Expiry (e.g., "0DTE")
-Entry price (e.g., "limit 1.2")
+4. Keyword detection:
+    - Start transcribing only when "call" (or similar) is detected.
+    - Keep transcribing until "end" (or similar) is detected.
+    - Extract only what’s spoken between "call" and "end".
 
-            If all required fields are found:
-                
-Format into a rich Discord message
-Post in a specific text channel (e.g., #live-callouts)
+5. Post that specific snippet into the text channel.
 
-        Else:
-            
-Optionally log or ignore unrecognized speech
+6. When TARGET_USER_ID leaves VC:
+    - Bot also disconnects from VC.
+    - Stops listening/transcribing.
 
-On "/stopCalloutBot" command:
-    
-Stop listening
-Leave voice channel

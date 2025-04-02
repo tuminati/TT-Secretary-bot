@@ -26,24 +26,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
-
-# === Command: Join voice channel ===
-@bot.command()
-async def startCalloutBot(ctx):
-    """Bot joins the voice channel."""
-    voice_channel = ctx.guild.get_channel(VC_ID)
-    if voice_channel:
-        await voice_channel.connect()
-        await ctx.send("📡 Bot connected to voice channel!")
-
-# === Command: Leave voice channel ===
-@bot.command()
-async def stopCalloutBot(ctx):
-    """Bot leaves the voice channel."""
-    if ctx.voice_client:
-        await ctx.voice_client.disconnect()
-        await ctx.send("👋 Bot disconnected from voice.")
-
+ 
 # 🧠 Whisper transcription test command
 @bot.command()
 async def testcallout(ctx):
@@ -60,6 +43,28 @@ async def testcallout(ctx):
     await ctx.send(f"🧠 Transcribed: {transcription}")  # Send result to the Discord text channel
 
 print("Looking for:", os.path.abspath("test_callout.wav"))
+
+# --- Track a specific user's VC activity ---
+@bot.event
+async def on_voice_state_update(member, before, after):
+    TARGET_USER_ID = 308259834657243139  # Replace with actual user's Discord ID
+
+    if member.id != TARGET_USER_ID:
+        return  # Ignore all other users
+
+    # User joins a voice channel
+    if before.channel is None and after.channel is not None:
+        voice_channel = after.channel
+        await voice_channel.connect()
+        print(f"🎯 Target user joined. Bot joined {voice_channel.name}")
+
+    # User leaves a voice channel
+    elif before.channel is not None and after.channel is None:
+        vc = discord.utils.get(bot.voice_clients, guild=member.guild)
+        if vc and vc.is_connected():
+            await vc.disconnect()
+            print("👋 Target user left. Bot disconnected.")
+
 
 # === Run the bot ===
 bot.run(TOKEN)
